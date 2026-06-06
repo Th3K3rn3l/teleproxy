@@ -8,85 +8,121 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/teleproxy/internal/goloom"
 	"github.com/teleproxy/internal/proxy"
 )
 
 func main() {
-	uid := flag.String("uid", "", "Yandex UID")
-	sessionCookie := flag.String("session", "", "Session_id cookie from yandex.ru")
+	mode := flag.String("mode", "create", "create or join")
+	uid := flag.String("uid", "", "Yandex UID (for create mode)")
+	sessionCookie := flag.String("session", "", "Session_id cookie (for create mode)")
 	displayName := flag.String("name", "ProxyServer", "Display name in conference")
-	conferenceURL := flag.String("url", "", "Conference URL to join")
-	listenAddr := flag.String("listen", "", "Create conference instead of joining")
+	conferenceURL := flag.String("url", "", "Conference URL to join (for join mode)")
 	flag.Parse()
 
-	if *uid == "" {
-		log.Fatal("-uid is required (Yandex UID)")
-	}
-
 	cfg := goloom.SessionConfig{
-		UID:           *uid,
-		SessionCookie: *sessionCookie,
-		DisplayName:   *displayName,
+		DisplayName: *displayName,
 	}
 
-	if *listenAddr != "" {
+	switch *mode {
+	case "create":
+		if *uid == "" {
+			log.Fatal("-uid is required for create mode")
+		}
 		cfg.Mode = goloom.ModeCreate
-		fmt.Printf("Creating conference as server...\n")
-	} else if *conferenceURL != "" {
+		cfg.UID = *uid
+		cfg.SessionCookie = *sessionCookie
+	case "join":
+		if *conferenceURL == "" {
+			log.Fatal("-url is required for join mode")
+		}
 		cfg.Mode = goloom.ModeJoin
 		cfg.ConferenceURI = *conferenceURL
-		fmt.Printf("Joining conference %s...\n", *conferenceURL)
-	} else {
-		cfg.Mode = goloom.ModeCreate
-		fmt.Printf("Creating conference as server...\n")
-	}
-
-	session := goloom.NewSession(cfg)
-
-	var handler *proxy.Handler
-
-	session.OnData(func(data []byte) {
-		if handler != nil {
-			handler.HandlePacket(data)
-		}
-	})
-
-	session.OnError(func(err error) {
-		log.Printf("Session error: %v", err)
-	})
-
-	session.OnClose(func() {
-		log.Println("Session closed")
-		os.Exit(1)
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	if err := session.Start(ctx); err != nil {
-		log.Fatalf("Failed to start session: %v", err)
-	}
-
-	handler = proxy.NewHandler(func(data []byte) error {
-		return session.Send(data)
-	})
-
-	log.Println("Waiting for client to connect via DataChannel...")
-	if err := session.WaitForDataChannel(ctx); err != nil {
-		log.Fatalf("Failed to establish data channel: %v", err)
-	}
-	log.Println("DataChannel established! Server ready.")
-
-	if *listenAddr != "" {
-		fmt.Printf("Conference URL: %s\n", session.ConferenceURL())
+	default:
+		log.Fatalf("unknown mode: %s", *mode)
 	}
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
 
-	log.Println("Shutting down...")
-	session.Close()
+	// Keep reconnecting forever (eternal conference)
+	for attempt := 1; ; attempt++ {
+		disconnected := make(chan struct{})
+		stopped := make(chan struct{})
+
+		session := goloom.NewSession(cfg)
+
+		var handler *proxy.Handler
+
+		session.OnData(func(data []byte) {
+			if handler != nil {
+				handler.HandlePacket(data)
+			}
+		})
+
+		session.OnError(func(err error) {
+			log.Printf("Session error: %v", err)
+		})
+
+		session.OnClose(func() {
+			select {
+			case <-disconnected:
+			default:
+				close(disconnected)
+			}
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		go func() {
+			select {
+			case <-sig:
+				cancel()
+				session.Close()
+			case <-disconnected:
+			}
+			close(stopped)
+		}()
+
+		if err := session.Start(ctx); err != nil {
+			log.Printf("Attempt %d failed: %v", attempt, err)
+			cancel()
+			<-stopped
+			time.Sleep(3 * time.Second)
+			continue
+		}
+
+		handler = proxy.NewHandler(func(data []byte) error {
+			return session.Send(data)
+		})
+
+		log.Printf("Waiting for data channel (attempt %d)...", attempt)
+		if err := session.WaitForDataChannel(ctx); err != nil {
+			log.Printf("Data channel timeout (attempt %d): %v", attempt, err)
+			session.Close()
+			<-stopped
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		log.Println("Data channel established! Server ready.")
+
+		if *mode == "create" {
+			u := session.ConferenceURL()
+			if u != "" {
+				fmt.Printf("\n=== CONFERENCE URL ===\n%s\n======================\n", u)
+			}
+		}
+
+		<-stopped
+
+		select {
+		case <-sig:
+			os.Exit(0)
+		default:
+		}
+		log.Println("Reconnecting in 3 seconds...")
+		time.Sleep(3 * time.Second)
+	}
 }

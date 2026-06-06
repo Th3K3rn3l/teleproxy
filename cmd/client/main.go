@@ -16,31 +16,19 @@ import (
 )
 
 func main() {
-	uid := flag.String("uid", "", "Yandex UID")
-	sessionCookie := flag.String("session", "", "Session_id cookie from yandex.ru")
+	conferenceURL := flag.String("url", "", "Conference URL from server")
 	displayName := flag.String("name", "ProxyClient", "Display name in conference")
-	mode := flag.String("mode", "create", "create or join")
-	conferenceURL := flag.String("url", "", "Conference URL to join (for join mode)")
 	socksAddr := flag.String("socks", "127.0.0.1:1080", "SOCKS5 listen address")
 	flag.Parse()
 
-	if *uid == "" {
-		log.Fatal("-uid is required (Yandex UID)")
+	if *conferenceURL == "" {
+		log.Fatal("-url is required (conference URL from server)")
 	}
 
 	cfg := goloom.SessionConfig{
-		UID:           *uid,
-		SessionCookie: *sessionCookie,
+		Mode:          goloom.ModeJoin,
 		DisplayName:   *displayName,
-		Mode:          goloom.ModeCreate,
-	}
-
-	if *mode == "join" {
-		if *conferenceURL == "" {
-			log.Fatal("-url is required for join mode")
-		}
-		cfg.Mode = goloom.ModeJoin
-		cfg.ConferenceURI = *conferenceURL
+		ConferenceURI: *conferenceURL,
 	}
 
 	session := goloom.NewSession(cfg)
@@ -93,11 +81,6 @@ func main() {
 	log.Println("Waiting for data channel...")
 	if err := session.WaitForDataChannel(ctx); err != nil {
 		log.Fatalf("Failed to establish data channel: %v", err)
-	}
-
-	conferenceURLStr := session.ConferenceURL()
-	if *mode == "create" && conferenceURLStr != "" {
-		fmt.Printf("\n=== CONFERENCE URL (give this to server) ===\n%s\n===========================================\n", conferenceURLStr)
 	}
 
 	fmt.Printf("SOCKS5 proxy listening on %s\n", *socksAddr)

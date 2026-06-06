@@ -3,9 +3,12 @@ package goloom
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -24,6 +27,14 @@ type SessionConfig struct {
 	ConferenceURI  string
 }
 
+type joinInfo struct {
+	roomID         string
+	peerID         string
+	mediaServerURL string
+	serviceName    string
+	credentials    string
+}
+
 type Session struct {
 	config    SessionConfig
 	api       *Client
@@ -33,6 +44,8 @@ type Session struct {
 
 	conf       *CreateConferenceResponse
 	serverHello *ServerHello
+
+	ji *joinInfo
 
 	mu               sync.Mutex
 	dataChannelReady chan struct{}
@@ -71,16 +84,19 @@ func (s *Session) ConferenceURL() string {
 }
 
 func (s *Session) Start(ctx context.Context) error {
+	var ji *joinInfo
 	var err error
+
 	switch s.config.Mode {
 	case ModeCreate:
-		s.conf, err = s.api.CreateConference()
+		ji, err = s.setupCreate(ctx)
 	case ModeJoin:
-		s.conf, err = s.api.JoinConference(s.config.ConferenceURI)
+		ji, err = s.setupJoin(ctx)
 	}
 	if err != nil {
-		return fmt.Errorf("conference setup: %w", err)
+		return err
 	}
+	s.ji = ji
 
 	pc, dc, err := s.createPeerConnection()
 	if err != nil {
@@ -108,21 +124,75 @@ func (s *Session) Start(ctx context.Context) error {
 
 	s.signaling = NewSignaling(s)
 
-	if err := s.signaling.Connect(ctx, s.conf.ClientConfiguration.MediaServerURL); err != nil {
+	if err := s.signaling.Connect(ctx, ji.mediaServerURL); err != nil {
 		return fmt.Errorf("signaling connect: %w", err)
 	}
 
 	if err := s.signaling.SendHello(
-		s.conf.RoomID,
-		s.conf.PeerID,
-		s.conf.ClientConfiguration.ServiceName,
-		s.conf.Credentials,
+		ji.roomID,
+		ji.peerID,
+		ji.serviceName,
+		ji.credentials,
 		s.config.DisplayName,
 	); err != nil {
 		return fmt.Errorf("hello: %w", err)
 	}
 
 	return nil
+}
+
+func (s *Session) setupCreate(ctx context.Context) (*joinInfo, error) {
+	conf, err := s.api.CreateConference()
+	if err != nil {
+		return nil, fmt.Errorf("conference setup: %w", err)
+	}
+	s.conf = conf
+
+	return &joinInfo{
+		roomID:         conf.RoomID,
+		peerID:         conf.PeerID,
+		mediaServerURL: conf.ClientConfiguration.MediaServerURL,
+		serviceName:    conf.ClientConfiguration.ServiceName,
+		credentials:    conf.Credentials,
+	}, nil
+}
+
+func (s *Session) setupJoin(ctx context.Context) (*joinInfo, error) {
+	roomID := extractRoomID(s.config.ConferenceURI)
+	if roomID == "" {
+		return nil, fmt.Errorf("invalid conference URL: %s", s.config.ConferenceURI)
+	}
+
+	conf, err := s.api.JoinConference(s.config.ConferenceURI)
+	if err == nil {
+		return &joinInfo{
+			roomID:         conf.RoomID,
+			peerID:         conf.PeerID,
+			mediaServerURL: conf.ClientConfiguration.MediaServerURL,
+			serviceName:    conf.ClientConfiguration.ServiceName,
+			credentials:    conf.Credentials,
+		}, nil
+	}
+
+	return &joinInfo{
+		roomID:         roomID,
+		peerID:         uuid.New().String(),
+		mediaServerURL: "wss://goloom.strm.yandex.net/join",
+		serviceName:    "telemost",
+		credentials:    "",
+	}, nil
+}
+
+func extractRoomID(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	parts := strings.Split(strings.TrimRight(u.Path, "/"), "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
 }
 
 func (s *Session) Send(data []byte) error {

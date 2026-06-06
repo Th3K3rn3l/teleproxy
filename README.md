@@ -5,122 +5,105 @@ HTTP(S)/TCP proxy через Yandex Telemost (SFU WebRTC). Позволяет о
 ## Как это работает
 
 ```
-Клиент (SOCKS5 127.0.0.1:1080) ←→ Yandex SFU (goloom.strm.yandex.net) ←→ Сервер (исходит запросы в интернет)
+Клиент (SOCKS5) ←→ Yandex SFU ←→ Сервер (исходит запросы в интернет)
 ```
 
-Оба конца подключаются к одной и той же конференции Telemost. Yandex SFU ретранслирует DataChannel между ними.
+Оба конца подключаются к одной конференции Telemost. Yandex SFU ретранслирует DataChannel между ними.
+
+**Сервер** (на VPS) создаёт конференцию и держит её вечно (автопереподключение при обрыве).  
+**Клиент** (на ПК) просто подключается по ссылке — никакой авторизации не нужно.
 
 ## Требования
 
 - Go 1.21+
-- Yandex UID (из cookies yandex.ru, `yandexuid` или `Session_id`)
-- Сервер — Linux с доступом в интернет
-- Клиент — Windows, Linux или Android
+- **Сервер:** Linux, Yandex UID + Session_id (для создания конференции)
+- **Клиент:** Windows/Linux/macOS, только ссылка на конференцию
 
 ## Установка
 
 ```bash
-git clone <repo> teleproxy
+git clone https://github.com/Th3K3rn3l/teleproxy.git
 cd teleproxy
-go mod tidy
 go build ./cmd/server
 go build ./cmd/client
 ```
 
 ## Использование
 
-### 1. Получить Yandex UID и Session_id
+### 1. Сервер (VPS) — создаёт конференцию
 
-Откройте https://passport.yandex.ru в браузере, откройте DevTools → Console и выполните:
-
-```js
-document.cookie.split('; ').find(c => c.startsWith('yandexuid=')).split('=')[1]
-```
-
-Или найдите `yandexuid` в cookies любого запроса на yandex.ru.
-
-Также понадобится `Session_id` cookie — её можно найти там же, в DevTools → Application → Cookies → yandex.ru. Значение выглядит как длинная строка вида `3:168...`.
-
-Оба параметра (`-uid` и `-session`) обязательны для авторизации API.
-
-### 2. Запустить сервер (на удалённой Linux-машине)
+На удалённой машине:
 
 ```bash
-./server -uid=<ВАШ_YANDEX_UID> -name=ProxyServer
+./server -mode=create -uid=1234567890 -session="3:168..."
 ```
 
-Сервер создаст конференцию и выведет URL вида:
+- `-uid` — `yandexuid` из cookie
+- `-session` — `Session_id` из cookie (берётся в браузере DevTools → Application → Cookies → yandex.ru)
+
+Сервер создаст конференцию, выведет URL и останется в ней навсегда:
+
 ```
-https://telemost.yandex.ru/j/1234567890
+=== CONFERENCE URL ===
+https://telemost.yandex.ru/j/abc123def
+======================
 ```
 
-Этот URL нужно передать клиенту (через чат, Telegram, email и т.д.).
+### 2. Клиент (ПК) — подключается по ссылке
 
-### 3. Запустить клиент (на вашем ПК)
+На вашем рабочем компьютере (без всяких cookie):
 
 ```bash
-./client -uid=<ВАШ_YANDEX_UID> -mode=join -url=https://telemost.yandex.ru/j/1234567890
+./client -url=https://telemost.yandex.ru/j/abc123def
 ```
 
-Клиент подключится к конференции, поднимет SOCKS5 прокси на `127.0.0.1:1080`.
+Клиент подключится к конференции и поднимет SOCKS5 прокси на `127.0.0.1:1080`.
 
-### 4. Настроить браузер
+### 3. Настроить браузер
 
-В Firefox: Настройки → Сеть → Настройка соединения → Ручная конфигурация прокси → SOCKS5 → `127.0.0.1:1080`.
-В Chrome: использовать `--proxy-server=socks5://127.0.0.1:1080` при запуске.
+**Firefox:** Настройки → Сеть → Настройка соединения → Ручная конфигурация прокси → SOCKS5 → `127.0.0.1:1080`.  
+**Chrome:** `chrome --proxy-server=socks5://127.0.0.1:1080`
 
-## Параметры командной строки
+Готово. Весь трафик браузера пойдёт через VPS.
+
+## Параметры
 
 ### Сервер
 
 | Флаг | По умолчанию | Описание |
 |------|-------------|----------|
-| `-uid` | — | Yandex UID (обязательно) |
-| `-session` | — | Session_id cookie (обязательно) |
-| `-name` | `ProxyServer` | Отображаемое имя в конференции |
-| `-url` | — | URL конференции для join-режима |
-| `-listen` | — | Указать этот флаг для явного создания конференции |
-
-Если не указан ни `-url`, ни `-listen`, сервер создаёт конференцию автоматически.
+| `-mode` | `create` | `create` или `join` |
+| `-uid` | — | Yandex UID (для `-mode=create`) |
+| `-session` | — | Session_id cookie (для `-mode=create`) |
+| `-name` | `ProxyServer` | Имя в конференции |
+| `-url` | — | URL конференции (для `-mode=join`) |
 
 ### Клиент
 
 | Флаг | По умолчанию | Описание |
 |------|-------------|----------|
-| `-uid` | — | Yandex UID (обязательно) |
-| `-session` | — | Session_id cookie (обязательно) |
-| `-name` | `ProxyClient` | Отображаемое имя в конференции |
-| `-mode` | `create` | `create` или `join` |
-| `-url` | — | URL конференции (для `-mode=join`) |
-| `-socks` | `127.0.0.1:1080` | Адрес SOCKS5 сервера |
+| `-url` | — | Ссылка на конференцию от сервера |
+| `-name` | `ProxyClient` | Имя в конференции |
+| `-socks` | `127.0.0.1:1080` | Адрес SOCKS5 прокси |
 
-## Режимы запуска
+## Как получить Session_id
 
-### Клиент создаёт конференцию, сервер подключается
+1. Откройте https://passport.yandex.ru в браузере, войдите в аккаунт
+2. DevTools (F12) → Application → Cookies → `yandex.ru`
+3. Найдите `Session_id` — длинная строка вида `3:168...`
+4. Найдите `yandexuid` — число, это ваш UID
 
-```bash
-# На клиенте (Windows):
-client -uid=12345 -mode=create
-# → выведет CONFERENCE URL, скопировать и отправить серверу
+Эти данные нужны только серверу для создания конференции. Клиенту — ничего.
 
-# На сервере (Linux):
-server -uid=12345 -url=https://telemost.yandex.ru/j/ABC123
-```
+## Режим join для сервера
 
-### Сервер создаёт конференцию, клиент подключается
+Если сервер перезагрузился и конференция ещё жива (кто-то в ней остаётся), можно подключиться к существующей:
 
 ```bash
-# На сервере (Linux):
-server -uid=12345
-# → выведет CONFERENCE URL, скопировать и отправить клиенту
-
-# На клиенте (Windows):
-client -uid=12345 -mode=join -url=https://telemost.yandex.ru/j/ABC123
+./server -mode=join -url=https://telemost.yandex.ru/j/abc123def
 ```
 
-## Сборка для Android
-
-Установите Android NDK и gomobile:
+Сборка для Android
 
 ```bash
 go install golang.org/x/mobile/cmd/gomobile@latest
@@ -130,7 +113,6 @@ gomobile bind -target=android -o teleproxy.aar github.com/teleproxy
 
 ## Ограничения
 
-- UDP в SOCKS5 поддерживается частично (только связка CONNECT + DNS-резолв через TCP)
-- ICE restart и автоматическое переподключение не реализованы
+- UDP в SOCKS5 — частично (только CONNECT + DNS через TCP)
 - STUN только (`stun.rtc.yandex.net:3478`), TURN не используется
-- DataChannel закрывается при выходе из конференции — сессию нужно перезапускать
+- Если Yandex SFU не принимает подключение без credentials, серверу нужно раздавать их клиентам через отдельный канал
