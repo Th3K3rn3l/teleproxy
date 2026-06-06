@@ -12,19 +12,9 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-type SessionMode int
-
-const (
-	ModeCreate SessionMode = iota
-	ModeJoin
-)
-
 type SessionConfig struct {
-	Mode           SessionMode
-	UID            string
-	SessionCookie  string
-	DisplayName    string
-	ConferenceURI  string
+	DisplayName   string
+	ConferenceURI string
 }
 
 type joinInfo struct {
@@ -37,19 +27,14 @@ type joinInfo struct {
 
 type Session struct {
 	config    SessionConfig
-	api       *Client
 	signaling *Signaling
 	peerConn  *webrtc.PeerConnection
 	dataChan  *webrtc.DataChannel
-
-	conf       *CreateConferenceResponse
-	serverHello *ServerHello
 
 	ji *joinInfo
 
 	mu               sync.Mutex
 	dataChannelReady chan struct{}
-	negotiationDone  chan struct{}
 	onData           func([]byte)
 	onError          func(error)
 	onClose          func()
@@ -58,9 +43,7 @@ type Session struct {
 func NewSession(config SessionConfig) *Session {
 	return &Session{
 		config:           config,
-		api:              NewClient(config.UID, config.SessionCookie),
 		dataChannelReady: make(chan struct{}),
-		negotiationDone:  make(chan struct{}),
 	}
 }
 
@@ -76,27 +59,21 @@ func (s *Session) OnClose(f func()) {
 	s.onClose = f
 }
 
-func (s *Session) ConferenceURL() string {
-	if s.conf != nil {
-		return s.conf.URI
-	}
-	return ""
-}
-
 func (s *Session) Start(ctx context.Context) error {
-	var ji *joinInfo
-	var err error
+	roomID := extractRoomID(s.config.ConferenceURI)
+	if roomID == "" {
+		return fmt.Errorf("invalid conference URL: %s", s.config.ConferenceURI)
+	}
 
-	switch s.config.Mode {
-	case ModeCreate:
-		ji, err = s.setupCreate(ctx)
-	case ModeJoin:
-		ji, err = s.setupJoin(ctx)
+	s.ji = &joinInfo{
+		roomID:         roomID,
+		peerID:         uuid.New().String(),
+		mediaServerURL: "wss://goloom.strm.yandex.net/join",
+		serviceName:    "telemost",
+		credentials:    "",
 	}
-	if err != nil {
-		return err
-	}
-	s.ji = ji
+
+	ji := s.ji
 
 	pc, dc, err := s.createPeerConnection()
 	if err != nil {
@@ -139,60 +116,6 @@ func (s *Session) Start(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (s *Session) setupCreate(ctx context.Context) (*joinInfo, error) {
-	conf, err := s.api.CreateConference()
-	if err != nil {
-		return nil, fmt.Errorf("conference setup: %w", err)
-	}
-	s.conf = conf
-
-	return &joinInfo{
-		roomID:         conf.RoomID,
-		peerID:         conf.PeerID,
-		mediaServerURL: conf.ClientConfiguration.MediaServerURL,
-		serviceName:    conf.ClientConfiguration.ServiceName,
-		credentials:    conf.Credentials,
-	}, nil
-}
-
-func (s *Session) setupJoin(ctx context.Context) (*joinInfo, error) {
-	roomID := extractRoomID(s.config.ConferenceURI)
-	if roomID == "" {
-		return nil, fmt.Errorf("invalid conference URL: %s", s.config.ConferenceURI)
-	}
-
-	conf, err := s.api.JoinConference(s.config.ConferenceURI)
-	if err == nil {
-		return &joinInfo{
-			roomID:         conf.RoomID,
-			peerID:         conf.PeerID,
-			mediaServerURL: conf.ClientConfiguration.MediaServerURL,
-			serviceName:    conf.ClientConfiguration.ServiceName,
-			credentials:    conf.Credentials,
-		}, nil
-	}
-
-	return &joinInfo{
-		roomID:         roomID,
-		peerID:         uuid.New().String(),
-		mediaServerURL: "wss://goloom.strm.yandex.net/join",
-		serviceName:    "telemost",
-		credentials:    "",
-	}, nil
-}
-
-func extractRoomID(rawURL string) string {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return ""
-	}
-	parts := strings.Split(strings.TrimRight(u.Path, "/"), "/")
-	if len(parts) == 0 {
-		return ""
-	}
-	return parts[len(parts)-1]
 }
 
 func (s *Session) Send(data []byte) error {
@@ -384,8 +307,7 @@ func (s *Session) OnIceCandidate(target string, candidate string, sdpMid string,
 
 func (s *Session) OnConnected(serverHello ServerHello) {
 	s.mu.Lock()
-	s.serverHello = &serverHello
-	s.mu.Unlock()
+	defer s.mu.Unlock()
 }
 
 func (s *Session) OnDisconnected(err error) {
@@ -396,11 +318,7 @@ func (s *Session) OnDisconnected(err error) {
 
 func (s *Session) HandleAck(uid string, status Status) {}
 
-func (s *Session) OnParticipantUpdate(desc []ParticipantDescription) {
-	s.SendAckFromSession(desc)
-}
-
-func (s *Session) SendAckFromSession(desc []ParticipantDescription) {}
+func (s *Session) OnParticipantUpdate(desc []ParticipantDescription) {}
 
 func (s *Session) handleError(err error) {
 	if s.onError != nil {
@@ -410,4 +328,16 @@ func (s *Session) handleError(err error) {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func extractRoomID(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	parts := strings.Split(strings.TrimRight(u.Path, "/"), "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
 }

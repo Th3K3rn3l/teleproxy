@@ -15,39 +15,24 @@ import (
 )
 
 func main() {
-	mode := flag.String("mode", "create", "create or join")
-	uid := flag.String("uid", "", "Yandex UID (for create mode)")
-	sessionCookie := flag.String("session", "", "Session_id cookie (for create mode)")
+	conferenceURL := flag.String("url", "", "Conference URL from telemost.yandex.ru")
 	displayName := flag.String("name", "ProxyServer", "Display name in conference")
-	conferenceURL := flag.String("url", "", "Conference URL to join (for join mode)")
 	flag.Parse()
 
-	cfg := goloom.SessionConfig{
-		DisplayName: *displayName,
+	if *conferenceURL == "" {
+		log.Fatal("-url is required (paste the Telemost conference link)")
 	}
 
-	switch *mode {
-	case "create":
-		if *uid == "" {
-			log.Fatal("-uid is required for create mode")
-		}
-		cfg.Mode = goloom.ModeCreate
-		cfg.UID = *uid
-		cfg.SessionCookie = *sessionCookie
-	case "join":
-		if *conferenceURL == "" {
-			log.Fatal("-url is required for join mode")
-		}
-		cfg.Mode = goloom.ModeJoin
-		cfg.ConferenceURI = *conferenceURL
-	default:
-		log.Fatalf("unknown mode: %s", *mode)
+	cfg := goloom.SessionConfig{
+		DisplayName:   *displayName,
+		ConferenceURI: *conferenceURL,
 	}
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
-	// Keep reconnecting forever (eternal conference)
+	fmt.Printf("Connecting to conference...\n")
+
 	for attempt := 1; ; attempt++ {
 		disconnected := make(chan struct{})
 		stopped := make(chan struct{})
@@ -106,14 +91,7 @@ func main() {
 			time.Sleep(3 * time.Second)
 			continue
 		}
-		log.Println("Data channel established! Server ready.")
-
-		if *mode == "create" {
-			u := session.ConferenceURL()
-			if u != "" {
-				fmt.Printf("\n=== CONFERENCE URL ===\n%s\n======================\n", u)
-			}
-		}
+		fmt.Println("Proxy server ready.")
 
 		<-stopped
 

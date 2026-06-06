@@ -16,17 +16,16 @@ import (
 )
 
 func main() {
-	conferenceURL := flag.String("url", "", "Conference URL from server")
+	conferenceURL := flag.String("url", "", "Conference URL from telemost.yandex.ru")
 	displayName := flag.String("name", "ProxyClient", "Display name in conference")
 	socksAddr := flag.String("socks", "127.0.0.1:1080", "SOCKS5 listen address")
 	flag.Parse()
 
 	if *conferenceURL == "" {
-		log.Fatal("-url is required (conference URL from server)")
+		log.Fatal("-url is required (paste the Telemost conference link)")
 	}
 
 	cfg := goloom.SessionConfig{
-		Mode:          goloom.ModeJoin,
 		DisplayName:   *displayName,
 		ConferenceURI: *conferenceURL,
 	}
@@ -68,6 +67,8 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	fmt.Printf("Connecting to conference...\n")
 
 	if err := session.Start(ctx); err != nil {
 		log.Fatalf("Failed to start session: %v", err)
