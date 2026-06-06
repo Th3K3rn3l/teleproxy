@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 
@@ -61,8 +62,12 @@ func (s *Signaling) Connect(ctx context.Context, urlStr string) error {
 
 	dialer := websocket.DefaultDialer
 	dialer.HandshakeTimeout = 10 * time.Second
+	dialer.Subprotocols = []string{}
 
-	conn, _, err := dialer.DialContext(ctx, urlStr, nil)
+	header := http.Header{}
+	header.Set("Origin", "https://telemost.yandex.ru")
+
+	conn, _, err := dialer.DialContext(ctx, urlStr, header)
 	if err != nil {
 		s.mu.Lock()
 		s.state = StateDisconnected
@@ -91,17 +96,18 @@ func (s *Signaling) SendHello(roomID, participantID, serviceName, credentials, d
 		UID: newUUID(),
 		Hello: &Hello{
 			ParticipantMeta: ParticipantMeta{
-				Name:      displayName,
-				Role:      "SPEAKER",
-				SendAudio: false,
-				SendVideo: false,
+				Name:        displayName,
+				Role:        "SPEAKER",
+				Description: "",
+				SendAudio:   false,
+				SendVideo:   false,
 			},
 			ParticipantAttributes: ParticipantAttributes{
-				Name:      displayName,
-				Role:      "SPEAKER",
+				Name:        displayName,
+				Role:        "SPEAKER",
 				Description: "",
 			},
-			SendAudio:     false,
+			SendAudio:     true,
 			SendVideo:     false,
 			SendSharing:   false,
 			ParticipantID: participantID,
