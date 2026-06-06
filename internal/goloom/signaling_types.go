@@ -170,7 +170,8 @@ type PublisherSDPOffer struct {
 }
 
 type SubscriberSDPAnswer struct {
-	SDP string `json:"sdp"`
+	PCSeq int    `json:"pcSeq"`
+	SDP   string `json:"sdp"`
 }
 
 type PublisherSDPAnswer struct {

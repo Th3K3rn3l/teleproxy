@@ -193,36 +193,41 @@ func (s *Signaling) SendPublisherSDPOffer(sdp string, pcSeq int) error {
 	if err := s.sendJSON(msg); err != nil {
 		return err
 	}
-	select {
-	case status := <-ch:
-		if status.Code != "OK" {
-			return fmt.Errorf("publisher offer rejected: %s", status.Description)
+	go func() {
+		select {
+		case status := <-ch:
+			if status.Code != "OK" {
+				log.Printf("publisher offer rejected: %s", status.Description)
+			}
+		case <-time.After(15 * time.Second):
+			log.Printf("publisher offer ack timeout")
 		}
-	case <-time.After(15 * time.Second):
-		return fmt.Errorf("publisher offer ack timeout")
-	}
+	}()
 	return nil
 }
 
-func (s *Signaling) SendSubscriberSDPAnswer(sdp string) error {
+func (s *Signaling) SendSubscriberSDPAnswer(sdp string, pcSeq int) error {
 	msg := SignalingMessage{
 		UID: newUUID(),
 		SubscriberSDPAnswer: &SubscriberSDPAnswer{
-			SDP: sdp,
+			PCSeq: pcSeq,
+			SDP:   sdp,
 		},
 	}
 	ch := s.registerPending(msg.UID)
 	if err := s.sendJSON(msg); err != nil {
 		return err
 	}
-	select {
-	case status := <-ch:
-		if status.Code != "OK" {
-			return fmt.Errorf("subscriber answer rejected: %s", status.Description)
+	go func() {
+		select {
+		case status := <-ch:
+			if status.Code != "OK" {
+				log.Printf("subscriber answer rejected: %s", status.Description)
+			}
+		case <-time.After(15 * time.Second):
+			log.Printf("subscriber answer ack timeout")
 		}
-	case <-time.After(15 * time.Second):
-		return fmt.Errorf("subscriber answer ack timeout")
-	}
+	}()
 	return nil
 }
 
@@ -365,6 +370,7 @@ func (s *Signaling) dispatch(msg SignalingMessage) {
 
 	if msg.PublisherSDPAnswer != nil {
 		log.Printf("WS publisherSdpAnswer received (sdp len=%d)", len(msg.PublisherSDPAnswer.SDP))
+		s.SendAck(msg.UID)
 		s.handlers.OnPublisherSDPAnswer(*msg.PublisherSDPAnswer)
 		return
 	}

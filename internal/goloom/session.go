@@ -240,42 +240,56 @@ func (s *Session) OnSubscriberSDPOffer(msg SubscriberSDPOffer) {
 		return
 	}
 
+	// 1. Set remote description (SFU's subscriber offer)
 	log.Printf("SDP: setting remote description (subscriber offer)")
 	offer := webrtc.SessionDescription{
 		Type: webrtc.SDPTypeOffer,
 		SDP:  msg.SDP,
 	}
-
 	if err := p.SetRemoteDescription(offer); err != nil {
 		s.handleError(fmt.Errorf("set remote desc: %w", err))
 		return
 	}
 
-	log.Printf("SDP: creating answer")
+	// 2. Create answer (subscriber side)
+	log.Printf("SDP: creating subscriber answer")
 	answer, err := p.CreateAnswer(nil)
 	if err != nil {
 		s.handleError(fmt.Errorf("create answer: %w", err))
 		return
 	}
 
-	log.Printf("SDP: waiting for ICE gather")
-	gatherComplete := webrtc.GatheringCompletePromise(p)
+	// 3. Set local description with answer → stable state
+	log.Printf("SDP: setting local description (answer)")
 	if err := p.SetLocalDescription(answer); err != nil {
 		s.handleError(fmt.Errorf("set local desc: %w", err))
 		return
 	}
-	<-gatherComplete
-	log.Printf("SDP: gather complete, sending subscriber answer")
 
-	if err := s.signaling.SendSubscriberSDPAnswer(p.LocalDescription().SDP); err != nil {
-		s.handleError(fmt.Errorf("send subscriber answer: %w", err))
+	// 4. Create publisher offer (fresh negotiation from stable)
+	log.Printf("SDP: creating publisher offer")
+	pubOffer, err := p.CreateOffer(nil)
+	if err != nil {
+		s.handleError(fmt.Errorf("create publisher offer: %w", err))
 		return
 	}
 
-	dc := s.dataChan
-	if dc == nil || dc.ReadyState() != webrtc.DataChannelStateOpen {
-		go s.sendPublisherOffer()
+	// 5. Set local description with publisher offer → have-local-offer
+	if err := p.SetLocalDescription(pubOffer); err != nil {
+		s.handleError(fmt.Errorf("set publisher offer: %w", err))
+		return
 	}
+
+	// 6. Wait for publisher ICE gather
+	gatherComplete := webrtc.GatheringCompletePromise(p)
+	<-gatherComplete
+
+	// 7. Send both messages in browser order: publisher offer first, subscriber answer second
+	log.Printf("SDP: sending publisher offer (pcSeq=1)")
+	s.signaling.SendPublisherSDPOffer(p.LocalDescription().SDP, 1)
+
+	log.Printf("SDP: sending subscriber answer with pcSeq=%d", msg.PCSeq)
+	s.signaling.SendSubscriberSDPAnswer(answer.SDP, msg.PCSeq)
 }
 
 func (s *Session) sendPublisherOffer() {
