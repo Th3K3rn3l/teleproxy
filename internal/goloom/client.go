@@ -1,7 +1,6 @@
 package goloom
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,13 +35,12 @@ func (c *Client) JoinConference(conferenceURI string) (*CreateConferenceResponse
 	u := fmt.Sprintf("%s%s/conferences/%s/connection?next_gen_media_platform_allowed=true&waiting_room_supported=true",
 		BaseURL, APIEndpoint, encoded)
 
-	req, err := http.NewRequest("POST", u, bytes.NewReader([]byte("{}")))
+	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
 	c.setHeaders(req)
-	req.Header.Set("Idempotency-Key", newUUID())
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
