@@ -267,7 +267,8 @@ func (s *Session) OnSubscriberSDPOffer(msg SubscriberSDPOffer) {
 	}
 
 	// 4. SAVE subscriber answer SDP with ICE credentials from SetLocalDescription
-	subscriberAnswerSDP := p.LocalDescription().SDP
+	// Match browser: use passive DTLS role (SFU is active) and limit max-message-size
+	subscriberAnswerSDP := fixAnswerSDP(p.LocalDescription().SDP)
 
 	// 5. Create publisher offer (fresh negotiation from stable)
 	log.Printf("SDP: creating publisher offer")
@@ -380,6 +381,13 @@ func (s *Session) handleError(err error) {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func fixAnswerSDP(sdp string) string {
+	sdp = strings.ReplaceAll(sdp, "\na=setup:active", "\na=setup:passive")
+	sdp = strings.ReplaceAll(sdp, "\na=ice-options:trickle\n", "\n")
+	sdp = strings.ReplaceAll(sdp, "a=max-message-size:1073741823", "a=max-message-size:262144")
+	return sdp
 }
 
 func extractRoomID(rawURL string) string {
