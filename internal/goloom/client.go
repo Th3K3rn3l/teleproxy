@@ -18,13 +18,15 @@ const (
 type Client struct {
 	httpClient     *http.Client
 	uid            string
+	sessionCookie  string
 	clientInstance string
 }
 
-func NewClient(uid string) *Client {
+func NewClient(uid string, sessionCookie string) *Client {
 	return &Client{
 		httpClient:     &http.Client{},
 		uid:            uid,
+		sessionCookie:  sessionCookie,
 		clientInstance: newUUID(),
 	}
 }
@@ -151,4 +153,7 @@ func (c *Client) setHeaders(req *http.Request) {
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 	req.Header.Set("X-Telemost-Client-Version", ClientVersion)
 	req.Header.Set("X-Uid", c.uid)
+	if c.sessionCookie != "" {
+		req.Header.Set("Cookie", "Session_id="+c.sessionCookie)
+	}
 }

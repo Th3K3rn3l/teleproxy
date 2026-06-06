@@ -17,6 +17,7 @@ import (
 
 func main() {
 	uid := flag.String("uid", "", "Yandex UID")
+	sessionCookie := flag.String("session", "", "Session_id cookie from yandex.ru")
 	displayName := flag.String("name", "ProxyClient", "Display name in conference")
 	mode := flag.String("mode", "create", "create or join")
 	conferenceURL := flag.String("url", "", "Conference URL to join (for join mode)")
@@ -28,9 +29,10 @@ func main() {
 	}
 
 	cfg := goloom.SessionConfig{
-		UID:         *uid,
-		DisplayName: *displayName,
-		Mode:        goloom.ModeCreate,
+		UID:           *uid,
+		SessionCookie: *sessionCookie,
+		DisplayName:   *displayName,
+		Mode:          goloom.ModeCreate,
 	}
 
 	if *mode == "join" {

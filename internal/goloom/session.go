@@ -19,6 +19,7 @@ const (
 type SessionConfig struct {
 	Mode           SessionMode
 	UID            string
+	SessionCookie  string
 	DisplayName    string
 	ConferenceURI  string
 }
@@ -44,7 +45,7 @@ type Session struct {
 func NewSession(config SessionConfig) *Session {
 	return &Session{
 		config:           config,
-		api:              NewClient(config.UID),
+		api:              NewClient(config.UID, config.SessionCookie),
 		dataChannelReady: make(chan struct{}),
 		negotiationDone:  make(chan struct{}),
 	}

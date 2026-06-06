@@ -15,6 +15,7 @@ import (
 
 func main() {
 	uid := flag.String("uid", "", "Yandex UID")
+	sessionCookie := flag.String("session", "", "Session_id cookie from yandex.ru")
 	displayName := flag.String("name", "ProxyServer", "Display name in conference")
 	conferenceURL := flag.String("url", "", "Conference URL to join")
 	listenAddr := flag.String("listen", "", "Create conference instead of joining")
@@ -25,8 +26,9 @@ func main() {
 	}
 
 	cfg := goloom.SessionConfig{
-		UID:         *uid,
-		DisplayName: *displayName,
+		UID:           *uid,
+		SessionCookie: *sessionCookie,
+		DisplayName:   *displayName,
 	}
 
 	if *listenAddr != "" {

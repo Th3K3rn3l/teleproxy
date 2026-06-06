@@ -29,7 +29,7 @@ go build ./cmd/client
 
 ## Использование
 
-### 1. Получить Yandex UID
+### 1. Получить Yandex UID и Session_id
 
 Откройте https://passport.yandex.ru в браузере, откройте DevTools → Console и выполните:
 
@@ -38,6 +38,10 @@ document.cookie.split('; ').find(c => c.startsWith('yandexuid=')).split('=')[1]
 ```
 
 Или найдите `yandexuid` в cookies любого запроса на yandex.ru.
+
+Также понадобится `Session_id` cookie — её можно найти там же, в DevTools → Application → Cookies → yandex.ru. Значение выглядит как длинная строка вида `3:168...`.
+
+Оба параметра (`-uid` и `-session`) обязательны для авторизации API.
 
 ### 2. Запустить сервер (на удалённой Linux-машине)
 
@@ -72,6 +76,7 @@ https://telemost.yandex.ru/j/1234567890
 | Флаг | По умолчанию | Описание |
 |------|-------------|----------|
 | `-uid` | — | Yandex UID (обязательно) |
+| `-session` | — | Session_id cookie (обязательно) |
 | `-name` | `ProxyServer` | Отображаемое имя в конференции |
 | `-url` | — | URL конференции для join-режима |
 | `-listen` | — | Указать этот флаг для явного создания конференции |
@@ -83,6 +88,7 @@ https://telemost.yandex.ru/j/1234567890
 | Флаг | По умолчанию | Описание |
 |------|-------------|----------|
 | `-uid` | — | Yandex UID (обязательно) |
+| `-session` | — | Session_id cookie (обязательно) |
 | `-name` | `ProxyClient` | Отображаемое имя в конференции |
 | `-mode` | `create` | `create` или `join` |
 | `-url` | — | URL конференции (для `-mode=join`) |
