@@ -352,6 +352,7 @@ func (s *Signaling) dispatch(msg SignalingMessage) {
 		s.mu.Lock()
 		s.state = StateInRoom
 		s.mu.Unlock()
+		s.SendAck(msg.UID)
 		s.handlers.OnConnected(*msg.ServerHello)
 		return
 	}

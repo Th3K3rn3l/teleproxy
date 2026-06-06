@@ -35,11 +35,12 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
+	quit := make(chan struct{})
+
 	fmt.Printf("Connecting to conference...\n")
 
 	for attempt := 1; ; attempt++ {
 		disconnected := make(chan struct{})
-		stopped := make(chan struct{})
 
 		session := goloom.NewSession(cfg)
 
@@ -70,16 +71,21 @@ func main() {
 			case <-sig:
 				cancel()
 				session.Close()
+				close(quit)
 			case <-disconnected:
+			case <-quit:
 			}
-			close(stopped)
+			cancel()
 		}()
 
 		if err := session.Start(ctx); err != nil {
 			log.Printf("Attempt %d failed: %v", attempt, err)
 			cancel()
-			<-stopped
-			time.Sleep(3 * time.Second)
+			select {
+			case <-quit:
+				return
+			case <-time.After(3 * time.Second):
+			}
 			continue
 		}
 
@@ -91,20 +97,21 @@ func main() {
 		if err := session.WaitForDataChannel(ctx); err != nil {
 			log.Printf("Data channel timeout (attempt %d): %v", attempt, err)
 			session.Close()
-			<-stopped
-			time.Sleep(3 * time.Second)
+			select {
+			case <-quit:
+				return
+			case <-time.After(3 * time.Second):
+			}
 			continue
 		}
 		fmt.Println("Proxy server ready.")
 
-		<-stopped
-
 		select {
-		case <-sig:
-			os.Exit(0)
-		default:
+		case <-quit:
+			return
+		case <-disconnected:
+			log.Println("Reconnecting in 3 seconds...")
+			time.Sleep(3 * time.Second)
 		}
-		log.Println("Reconnecting in 3 seconds...")
-		time.Sleep(3 * time.Second)
 	}
 }
