@@ -26,17 +26,29 @@ type Status struct {
 	Description string `json:"description,omitempty"`
 }
 
+type SdkInfo struct {
+	Implementation string `json:"implementation"`
+	Version        string `json:"version"`
+	UserAgent      string `json:"userAgent"`
+	HWConcurrency  int    `json:"hwConcurrency"`
+}
+
 type Hello struct {
-	ParticipantMeta      ParticipantMeta      `json:"participantMeta"`
+	ParticipantMeta       ParticipantMeta       `json:"participantMeta"`
 	ParticipantAttributes ParticipantAttributes `json:"participantAttributes"`
-	SendAudio            bool                 `json:"sendAudio"`
-	SendVideo            bool                 `json:"sendVideo"`
-	SendSharing          bool                 `json:"sendSharing"`
-	ParticipantID        string               `json:"participantId"`
-	RoomID               string               `json:"roomId"`
-	ServiceName          string               `json:"serviceName"`
-	Credentials          string               `json:"credentials"`
-	CapabilitiesOffer    Capabilities          `json:"capabilitiesOffer"`
+	SendAudio             bool                  `json:"sendAudio"`
+	SendVideo             bool                  `json:"sendVideo"`
+	SendSharing           bool                  `json:"sendSharing"`
+	ParticipantID         string                `json:"participantId"`
+	RoomID                string                `json:"roomId"`
+	ServiceName           string                `json:"serviceName"`
+	Credentials           string                `json:"credentials"`
+	CapabilitiesOffer     Capabilities           `json:"capabilitiesOffer"`
+	SdkInitializationId   string                `json:"sdkInitializationId"`
+	SdkInfo               SdkInfo               `json:"sdkInfo"`
+	DisablePublisher      bool                  `json:"disablePublisher"`
+	DisableSubscriber     bool                  `json:"disableSubscriber"`
+	DisableSubscriberAudio bool                 `json:"disableSubscriberAudio"`
 }
 
 type ParticipantMeta struct {
@@ -54,26 +66,41 @@ type ParticipantAttributes struct {
 }
 
 type Capabilities struct {
-	OfferAnswerMode            []string `json:"offerAnswerMode"`
-	InitialSubscriberOffer     []string `json:"initialSubscriberOffer"`
-	SlotsMode                  []string `json:"slotsMode"`
-	SimulcastMode              []string `json:"simulcastMode"`
-	SelfVadStatus              []string `json:"selfVadStatus"`
-	DataChannelSharing         []string `json:"dataChannelSharing"`
-	VideoEncoderConfig         []string `json:"videoEncoderConfig"`
-	DataChannelVideoCodec      []string `json:"dataChannelVideoCodec"`
-	BandwidthLimitationReason  []string `json:"bandwidthLimitationReason"`
-	SDKDefaultDeviceManagement []string `json:"sdkDefaultDeviceManagement"`
-	JoinOrderLayout            []string `json:"joinOrderLayout"`
-	PinLayout                  []string `json:"pinLayout"`
-	SendSelfViewVideoSlot      []string `json:"sendSelfViewVideoSlot"`
-	ServerLayoutTransition     []string `json:"serverLayoutTransition"`
-	SDKPublisherOptimizeBitrate []string `json:"sdkPublisherOptimizeBitrate"`
-	SDKNetworkLostDetection    []string `json:"sdkNetworkLostDetection"`
-	SDKNetworkPathMonitor      []string `json:"sdkNetworkPathMonitor"`
-	PublisherVp9               []string `json:"publisherVp9"`
-	SVCMode                    []string `json:"svcMode"`
-	SubscriberOfferAsyncAck    []string `json:"subscriberOfferAsyncAck"`
+	OfferAnswerMode              []string `json:"offerAnswerMode"`
+	InitialSubscriberOffer       []string `json:"initialSubscriberOffer"`
+	SlotsMode                    []string `json:"slotsMode"`
+	SimulcastMode                []string `json:"simulcastMode"`
+	SelfVadStatus                []string `json:"selfVadStatus"`
+	DataChannelSharing           []string `json:"dataChannelSharing"`
+	VideoEncoderConfig           []string `json:"videoEncoderConfig"`
+	DataChannelVideoCodec        []string `json:"dataChannelVideoCodec"`
+	BandwidthLimitationReason    []string `json:"bandwidthLimitationReason"`
+	SDKDefaultDeviceManagement   []string `json:"sdkDefaultDeviceManagement"`
+	JoinOrderLayout              []string `json:"joinOrderLayout"`
+	PinLayout                    []string `json:"pinLayout"`
+	SendSelfViewVideoSlot        []string `json:"sendSelfViewVideoSlot"`
+	ServerLayoutTransition       []string `json:"serverLayoutTransition"`
+	SDKPublisherOptimizeBitrate  []string `json:"sdkPublisherOptimizeBitrate"`
+	SDKNetworkLostDetection      []string `json:"sdkNetworkLostDetection"`
+	SDKNetworkPathMonitor        []string `json:"sdkNetworkPathMonitor"`
+	PublisherVp9                 []string `json:"publisherVp9"`
+	SVCMode                      []string `json:"svcMode"`
+	SubscriberOfferAsyncAck      []string `json:"subscriberOfferAsyncAck"`
+	AndroidBluetoothRoutingFix   []string `json:"androidBluetoothRoutingFix"`
+	FixedIceCandidatesPoolSize   []string `json:"fixedIceCandidatesPoolSize"`
+	SDKAndroidTelecomIntegration []string `json:"sdkAndroidTelecomIntegration"`
+	SetActiveCodecsMode          []string `json:"setActiveCodecsMode"`
+	SubscriberDtlsPassiveMode    []string `json:"subscriberDtlsPassiveMode"`
+	PublisherOpusDred            []string `json:"publisherOpusDred"`
+	PublisherOpusLowBitrate      []string `json:"publisherOpusLowBitrate"`
+	SDKAndroidDestroySessionOnTaskRemoved []string `json:"sdkAndroidDestroySessionOnTaskRemoved"`
+	PublisherOpusDredAndroid     []string `json:"publisherOpusDredAndroid"`
+	PublisherOpusDredIos         []string `json:"publisherOpusDredIos"`
+	SubscriberOpusDredAndroid    []string `json:"subscriberOpusDredAndroid"`
+	SubscriberOpusDredIos        []string `json:"subscriberOpusDredIos"`
+	SVCModes                     []string `json:"svcModes"`
+	ReportTelemetryModes         []string `json:"reportTelemetryModes"`
+	KeepDefaultDevicesModes      []string `json:"keepDefaultDevicesModes"`
 }
 
 type ServerHello struct {
@@ -109,7 +136,7 @@ type CapabilitiesAnswer struct {
 
 type ServingComponent struct {
 	Type string `json:"type"`
-	URI  string `json:"uri,omitempty"`
+	Host string `json:"host,omitempty"`
 }
 
 type UpdateDescription struct {
