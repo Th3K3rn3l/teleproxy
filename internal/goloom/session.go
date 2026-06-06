@@ -201,6 +201,7 @@ func (s *Session) createPeerConnection() (*webrtc.PeerConnection, *webrtc.DataCh
 
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
 		if c == nil {
+			log.Printf("ICE: gathering complete (end-of-candidates)")
 			return
 		}
 		cJSON := c.ToJSON()
@@ -215,6 +216,7 @@ func (s *Session) createPeerConnection() (*webrtc.PeerConnection, *webrtc.DataCh
 		if cJSON.SDPMLineIndex != nil {
 			sdpMLineIndex = int(*cJSON.SDPMLineIndex)
 		}
+		log.Printf("ICE: sending candidate target=PUBLISHER candidate=%s", cJSON.Candidate)
 		s.signaling.SendICECandidate("PUBLISHER", cJSON.Candidate, sdpMid, sdpMLineIndex)
 	})
 
