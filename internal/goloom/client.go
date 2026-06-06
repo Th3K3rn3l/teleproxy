@@ -72,7 +72,9 @@ func (c *Client) setHeaders(req *http.Request) {
 	req.Header.Set("Referer", "https://telemost.yandex.ru/")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 	req.Header.Set("X-Telemost-Client-Version", ClientVersion)
-	req.Header.Set("X-Uid", c.uid)
+	if c.uid != "" {
+		req.Header.Set("X-Uid", c.uid)
+	}
 	if c.sessionCookie != "" {
 		req.Header.Set("Cookie", "Session_id="+c.sessionCookie+"; yandexuid="+c.uid)
 	}

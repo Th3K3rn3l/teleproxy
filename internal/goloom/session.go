@@ -48,9 +48,7 @@ func NewSession(config SessionConfig) *Session {
 		config:           config,
 		dataChannelReady: make(chan struct{}),
 	}
-	if config.UID != "" {
-		s.api = NewClient(config.UID, config.SessionCookie)
-	}
+	s.api = NewClient(config.UID, config.SessionCookie)
 	return s
 }
 
@@ -80,20 +78,18 @@ func (s *Session) Start(ctx context.Context) error {
 		credentials:    "",
 	}
 
-	if s.api != nil {
-		conf, err := s.api.JoinConference(s.config.ConferenceURI)
-		if err == nil {
-			ji.roomID = conf.RoomID
-			ji.peerID = conf.PeerID
-			if conf.ClientConfiguration.MediaServerURL != "" {
-				ji.mediaServerURL = conf.ClientConfiguration.MediaServerURL
-			}
-			if conf.ClientConfiguration.ServiceName != "" {
-				ji.serviceName = conf.ClientConfiguration.ServiceName
-			}
-			if conf.Credentials != "" {
-				ji.credentials = conf.Credentials
-			}
+	conf, err := s.api.JoinConference(s.config.ConferenceURI)
+	if err == nil {
+		ji.roomID = conf.RoomID
+		ji.peerID = conf.PeerID
+		if conf.ClientConfiguration.MediaServerURL != "" {
+			ji.mediaServerURL = conf.ClientConfiguration.MediaServerURL
+		}
+		if conf.ClientConfiguration.ServiceName != "" {
+			ji.serviceName = conf.ClientConfiguration.ServiceName
+		}
+		if conf.Credentials != "" {
+			ji.credentials = conf.Credentials
 		}
 	}
 
