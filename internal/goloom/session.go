@@ -280,17 +280,14 @@ func (s *Session) OnSubscriberSDPOffer(msg SubscriberSDPOffer) {
 		return
 	}
 
-	// 6. Set local description with publisher offer → have-local-offer
+	// 6. Set local description with publisher offer → have-local-offer (triggers ICE gathering)
 	if err := p.SetLocalDescription(pubOffer); err != nil {
 		s.handleError(fmt.Errorf("set publisher offer: %w", err))
 		return
 	}
 
-	// 7. Wait for publisher ICE gather
-	gatherComplete := webrtc.GatheringCompletePromise(p)
-	<-gatherComplete
-
-	// 8. Send both messages in browser order: publisher offer first, subscriber answer second
+	// 7. Send both SDPs IMMEDIATELY (don't wait for ICE gather - browser does trickle ICE)
+	//    ICE candidates will arrive via OnICECandidate after SDPs are sent
 	log.Printf("SDP: sending publisher offer (pcSeq=1, sdp_len=%d)", len(p.LocalDescription().SDP))
 	log.Printf("PUBLISHER_OFFER_SDP: %s", p.LocalDescription().SDP)
 	s.signaling.SendPublisherSDPOffer(p.LocalDescription().SDP, 1)
