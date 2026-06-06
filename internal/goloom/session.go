@@ -15,6 +15,8 @@ import (
 type SessionConfig struct {
 	DisplayName   string
 	ConferenceURI string
+	UID           string
+	SessionCookie string
 }
 
 type joinInfo struct {
@@ -27,6 +29,7 @@ type joinInfo struct {
 
 type Session struct {
 	config    SessionConfig
+	api       *Client
 	signaling *Signaling
 	peerConn  *webrtc.PeerConnection
 	dataChan  *webrtc.DataChannel
@@ -41,10 +44,14 @@ type Session struct {
 }
 
 func NewSession(config SessionConfig) *Session {
-	return &Session{
+	s := &Session{
 		config:           config,
 		dataChannelReady: make(chan struct{}),
 	}
+	if config.UID != "" {
+		s.api = NewClient(config.UID, config.SessionCookie)
+	}
+	return s
 }
 
 func (s *Session) OnData(f func([]byte)) {
@@ -65,7 +72,7 @@ func (s *Session) Start(ctx context.Context) error {
 		return fmt.Errorf("invalid conference URL: %s", s.config.ConferenceURI)
 	}
 
-	s.ji = &joinInfo{
+	ji := &joinInfo{
 		roomID:         roomID,
 		peerID:         uuid.New().String(),
 		mediaServerURL: "wss://goloom.strm.yandex.net/join",
@@ -73,7 +80,24 @@ func (s *Session) Start(ctx context.Context) error {
 		credentials:    "",
 	}
 
-	ji := s.ji
+	if s.api != nil {
+		conf, err := s.api.JoinConference(s.config.ConferenceURI)
+		if err == nil {
+			ji.roomID = conf.RoomID
+			ji.peerID = conf.PeerID
+			if conf.ClientConfiguration.MediaServerURL != "" {
+				ji.mediaServerURL = conf.ClientConfiguration.MediaServerURL
+			}
+			if conf.ClientConfiguration.ServiceName != "" {
+				ji.serviceName = conf.ClientConfiguration.ServiceName
+			}
+			if conf.Credentials != "" {
+				ji.credentials = conf.Credentials
+			}
+		}
+	}
+
+	s.ji = ji
 
 	pc, dc, err := s.createPeerConnection()
 	if err != nil {

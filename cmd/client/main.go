@@ -17,6 +17,8 @@ import (
 
 func main() {
 	conferenceURL := flag.String("url", "", "Conference URL from telemost.yandex.ru")
+	uid := flag.String("uid", "", "Yandex UID (optional, for REST API join)")
+	sessionCookie := flag.String("session", "", "Session_id cookie (optional, for REST API join)")
 	displayName := flag.String("name", "ProxyClient", "Display name in conference")
 	socksAddr := flag.String("socks", "127.0.0.1:1080", "SOCKS5 listen address")
 	flag.Parse()
@@ -28,6 +30,8 @@ func main() {
 	cfg := goloom.SessionConfig{
 		DisplayName:   *displayName,
 		ConferenceURI: *conferenceURL,
+		UID:           *uid,
+		SessionCookie: *sessionCookie,
 	}
 
 	session := goloom.NewSession(cfg)
