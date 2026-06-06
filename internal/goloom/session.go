@@ -266,7 +266,10 @@ func (s *Session) OnSubscriberSDPOffer(msg SubscriberSDPOffer) {
 		return
 	}
 
-	// 4. Create publisher offer (fresh negotiation from stable)
+	// 4. SAVE subscriber answer SDP with ICE credentials from SetLocalDescription
+	subscriberAnswerSDP := p.LocalDescription().SDP
+
+	// 5. Create publisher offer (fresh negotiation from stable)
 	log.Printf("SDP: creating publisher offer")
 	pubOffer, err := p.CreateOffer(nil)
 	if err != nil {
@@ -274,24 +277,24 @@ func (s *Session) OnSubscriberSDPOffer(msg SubscriberSDPOffer) {
 		return
 	}
 
-	// 5. Set local description with publisher offer → have-local-offer
+	// 6. Set local description with publisher offer → have-local-offer
 	if err := p.SetLocalDescription(pubOffer); err != nil {
 		s.handleError(fmt.Errorf("set publisher offer: %w", err))
 		return
 	}
 
-	// 6. Wait for publisher ICE gather
+	// 7. Wait for publisher ICE gather
 	gatherComplete := webrtc.GatheringCompletePromise(p)
 	<-gatherComplete
 
-	// 7. Send both messages in browser order: publisher offer first, subscriber answer second
+	// 8. Send both messages in browser order: publisher offer first, subscriber answer second
 	log.Printf("SDP: sending publisher offer (pcSeq=1, sdp_len=%d)", len(p.LocalDescription().SDP))
 	log.Printf("PUBLISHER_OFFER_SDP: %s", p.LocalDescription().SDP)
 	s.signaling.SendPublisherSDPOffer(p.LocalDescription().SDP, 1)
 
-	log.Printf("SDP: sending subscriber answer with pcSeq=%d (sdp_len=%d)", msg.PCSeq, len(answer.SDP))
-	log.Printf("SUBSCRIBER_ANSWER_SDP: %s", answer.SDP)
-	s.signaling.SendSubscriberSDPAnswer(answer.SDP, msg.PCSeq)
+	log.Printf("SDP: sending subscriber answer with pcSeq=%d (sdp_len=%d)", msg.PCSeq, len(subscriberAnswerSDP))
+	log.Printf("SUBSCRIBER_ANSWER_SDP: %s", subscriberAnswerSDP)
+	s.signaling.SendSubscriberSDPAnswer(subscriberAnswerSDP, msg.PCSeq)
 }
 
 func (s *Session) sendPublisherOffer() {
