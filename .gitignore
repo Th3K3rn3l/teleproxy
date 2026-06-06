@@ -1,0 +1,19 @@
+# binaries
+server
+client
+*.exe
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go
+vendor/
+
+# OS
+.DS_Store
+Thumbs.db
