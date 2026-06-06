@@ -3,6 +3,7 @@ package goloom
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/url"
 	"strings"
 	"sync"
@@ -79,7 +80,11 @@ func (s *Session) Start(ctx context.Context) error {
 	}
 
 	conf, err := s.api.JoinConference(s.config.ConferenceURI)
-	if err == nil {
+	if err != nil {
+		log.Printf("REST API join failed (proceeding without credentials): %v", err)
+	} else {
+		log.Printf("REST API join OK: room=%s peer=%s hasCredentials=%v ws=%s",
+			conf.RoomID, conf.PeerID, conf.Credentials != "", conf.ClientConfiguration.MediaServerURL)
 		ji.roomID = conf.RoomID
 		ji.peerID = conf.PeerID
 		if conf.ClientConfiguration.MediaServerURL != "" {
@@ -92,6 +97,8 @@ func (s *Session) Start(ctx context.Context) error {
 			ji.credentials = conf.Credentials
 		}
 	}
+
+	log.Printf("Connecting to WS with: room=%s peer=%s creds_len=%d", ji.roomID, ji.peerID, len(ji.credentials))
 
 	s.ji = ji
 
@@ -229,9 +236,11 @@ func (s *Session) createPeerConnection() (*webrtc.PeerConnection, *webrtc.DataCh
 func (s *Session) OnSubscriberSDPOffer(msg SubscriberSDPOffer) {
 	p := s.peerConn
 	if p == nil {
+		log.Printf("SDP: no peer connection")
 		return
 	}
 
+	log.Printf("SDP: setting remote description (subscriber offer)")
 	offer := webrtc.SessionDescription{
 		Type: webrtc.SDPTypeOffer,
 		SDP:  msg.SDP,
@@ -242,18 +251,21 @@ func (s *Session) OnSubscriberSDPOffer(msg SubscriberSDPOffer) {
 		return
 	}
 
+	log.Printf("SDP: creating answer")
 	answer, err := p.CreateAnswer(nil)
 	if err != nil {
 		s.handleError(fmt.Errorf("create answer: %w", err))
 		return
 	}
 
+	log.Printf("SDP: waiting for ICE gather")
 	gatherComplete := webrtc.GatheringCompletePromise(p)
 	if err := p.SetLocalDescription(answer); err != nil {
 		s.handleError(fmt.Errorf("set local desc: %w", err))
 		return
 	}
 	<-gatherComplete
+	log.Printf("SDP: gather complete, sending subscriber answer")
 
 	if err := s.signaling.SendSubscriberSDPAnswer(p.LocalDescription().SDP); err != nil {
 		s.handleError(fmt.Errorf("send subscriber answer: %w", err))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -133,6 +134,7 @@ func (s *Signaling) SendHello(roomID, participantID, serviceName, credentials, d
 	}
 
 	_, err := s.sendMessage(hello)
+	log.Printf("WS hello sent: room=%s participant=%s creds_len=%d", roomID, participantID, len(credentials))
 	return err
 }
 
@@ -290,13 +292,20 @@ func (s *Signaling) readLoop() {
 }
 
 func (s *Signaling) dispatch(msg SignalingMessage) {
+	log.Printf("WS recv: type=ack=%v serverHello=%v subOffer=%v pubAnswer=%v ice=%v update=%v vad=%v",
+		msg.Ack != nil, msg.ServerHello != nil, msg.SubscriberSDPOffer != nil,
+		msg.PublisherSDPAnswer != nil, msg.WebRTCIceCandidate != nil,
+		msg.UpdateDescription != nil, msg.VADActivity != nil)
+
 	if msg.Ack != nil {
+		log.Printf("WS ack: uid=%s code=%s desc=%s", msg.UID[:8], msg.Ack.Status.Code, msg.Ack.Status.Description)
 		s.resolvePending(msg.UID, msg.Ack.Status)
 		s.handlers.HandleAck(msg.UID, msg.Ack.Status)
 		return
 	}
 
 	if msg.ServerHello != nil {
+		log.Printf("WS serverHello received")
 		s.mu.Lock()
 		s.state = StateInRoom
 		s.mu.Unlock()
@@ -305,16 +314,19 @@ func (s *Signaling) dispatch(msg SignalingMessage) {
 	}
 
 	if msg.SubscriberSDPOffer != nil {
+		log.Printf("WS subscriberSdpOffer received (sdp len=%d)", len(msg.SubscriberSDPOffer.SDP))
 		s.handlers.OnSubscriberSDPOffer(*msg.SubscriberSDPOffer)
 		return
 	}
 
 	if msg.PublisherSDPAnswer != nil {
+		log.Printf("WS publisherSdpAnswer received (sdp len=%d)", len(msg.PublisherSDPAnswer.SDP))
 		s.handlers.OnPublisherSDPAnswer(*msg.PublisherSDPAnswer)
 		return
 	}
 
 	if msg.WebRTCIceCandidate != nil {
+		log.Printf("WS ice candidate: target=%s", msg.WebRTCIceCandidate.Target)
 		s.handlers.OnIceCandidate(
 			msg.WebRTCIceCandidate.Target,
 			msg.WebRTCIceCandidate.Candidate,
@@ -325,13 +337,14 @@ func (s *Signaling) dispatch(msg SignalingMessage) {
 	}
 
 	if msg.UpdateDescription != nil {
+		log.Printf("WS updateDescription: %d participants", len(msg.UpdateDescription.Description))
 		s.handlers.OnParticipantUpdate(msg.UpdateDescription.Description)
-		// Ack automatically
 		s.SendAck(msg.UID)
 		return
 	}
 
 	if msg.VADActivity != nil {
+		log.Printf("WS vadActivity")
 		s.SendAck(msg.UID)
 		return
 	}
