@@ -285,10 +285,12 @@ func (s *Session) OnSubscriberSDPOffer(msg SubscriberSDPOffer) {
 	<-gatherComplete
 
 	// 7. Send both messages in browser order: publisher offer first, subscriber answer second
-	log.Printf("SDP: sending publisher offer (pcSeq=1)")
+	log.Printf("SDP: sending publisher offer (pcSeq=1, sdp_len=%d)", len(p.LocalDescription().SDP))
+	log.Printf("PUBLISHER_OFFER_SDP: %s", p.LocalDescription().SDP)
 	s.signaling.SendPublisherSDPOffer(p.LocalDescription().SDP, 1)
 
-	log.Printf("SDP: sending subscriber answer with pcSeq=%d", msg.PCSeq)
+	log.Printf("SDP: sending subscriber answer with pcSeq=%d (sdp_len=%d)", msg.PCSeq, len(answer.SDP))
+	log.Printf("SUBSCRIBER_ANSWER_SDP: %s", answer.SDP)
 	s.signaling.SendSubscriberSDPAnswer(answer.SDP, msg.PCSeq)
 }
 

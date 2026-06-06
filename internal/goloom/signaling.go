@@ -364,12 +364,14 @@ func (s *Signaling) dispatch(msg SignalingMessage) {
 
 	if msg.SubscriberSDPOffer != nil {
 		log.Printf("WS subscriberSdpOffer received (sdp len=%d)", len(msg.SubscriberSDPOffer.SDP))
+		log.Printf("SUBSCRIBER_OFFER_SDP: %s", msg.SubscriberSDPOffer.SDP)
 		s.handlers.OnSubscriberSDPOffer(*msg.SubscriberSDPOffer)
 		return
 	}
 
 	if msg.PublisherSDPAnswer != nil {
 		log.Printf("WS publisherSdpAnswer received (sdp len=%d)", len(msg.PublisherSDPAnswer.SDP))
+		log.Printf("PUBLISHER_ANSWER_SDP: %s", msg.PublisherSDPAnswer.SDP)
 		s.SendAck(msg.UID)
 		s.handlers.OnPublisherSDPAnswer(*msg.PublisherSDPAnswer)
 		return
