@@ -294,7 +294,10 @@ func (s *Session) OnSubscriberSDPOffer(msg SubscriberSDPOffer) {
 
 	log.Printf("SDP: sending subscriber answer with pcSeq=%d (sdp_len=%d)", msg.PCSeq, len(subscriberAnswerSDP))
 	log.Printf("SUBSCRIBER_ANSWER_SDP: %s", subscriberAnswerSDP)
-	s.signaling.SendSubscriberSDPAnswer(subscriberAnswerSDP, msg.PCSeq)
+	// Send the answer and log the JSON being sent
+	if err := s.signaling.SendSubscriberSDPAnswer(subscriberAnswerSDP, msg.PCSeq); err != nil {
+		log.Printf("subscriber answer send error: %v", err)
+	}
 }
 
 func (s *Session) sendPublisherOffer() {

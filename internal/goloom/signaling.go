@@ -275,6 +275,12 @@ func (s *Signaling) sendJSON(msg any) error {
 	if s.conn == nil {
 		return fmt.Errorf("not connected")
 	}
+	raw, _ := json.Marshal(msg)
+	msgStr := string(raw)
+	if len(msgStr) > 200 {
+		msgStr = msgStr[:200] + "..."
+	}
+	log.Printf("WS send: %s", msgStr)
 	return s.conn.WriteJSON(msg)
 }
 
