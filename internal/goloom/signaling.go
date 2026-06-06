@@ -139,9 +139,21 @@ func (s *Signaling) SendHello(roomID, participantID, serviceName, credentials, d
 		},
 	}
 
-	_, err := s.sendMessage(hello)
-	log.Printf("WS hello sent: room=%s participant=%s creds_len=%d", roomID, participantID, len(credentials))
-	return err
+	ch, err := s.sendMessage(hello)
+	if err != nil {
+		return err
+	}
+	log.Printf("WS hello sent: room=%s participant=%s creds_len=%d, waiting for ack...", roomID, participantID, len(credentials))
+	select {
+	case status := <-ch:
+		if status.Code != "OK" {
+			return fmt.Errorf("hello rejected: %s", status.Description)
+		}
+		log.Printf("WS hello ack OK")
+	case <-time.After(15 * time.Second):
+		return fmt.Errorf("hello ack timeout")
+	}
+	return nil
 }
 
 func (s *Signaling) SendPublisherSDPOffer(sdp string, pcSeq int) error {

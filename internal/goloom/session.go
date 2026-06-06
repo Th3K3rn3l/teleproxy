@@ -343,6 +343,7 @@ func (s *Session) OnConnected(serverHello ServerHello) {
 }
 
 func (s *Session) OnDisconnected(err error) {
+	log.Printf("WebSocket disconnected: %v", err)
 	if s.onClose != nil {
 		s.onClose()
 	}
